@@ -161,7 +161,7 @@ This is v0 — a working proof of concept. The compiler and runtime are function
 - SQLite database with generated repositories
 - Compose Multiplatform UI generation
 - CLI with `new`, `build`, `dev`, `parse` commands
-- 184 passing tests
+- 189 passing tests
 
 What's not done yet: `plaing run` (compile + launch), runtime error messages in plain English, more UI elements, validation rules, permissions, pagination. See [Contributing](#contributing) if any of that interests you.
 

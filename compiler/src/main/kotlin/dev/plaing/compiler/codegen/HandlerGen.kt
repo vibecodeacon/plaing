@@ -4,10 +4,15 @@ import dev.plaing.compiler.parser.*
 
 class HandlerGen {
     // Track which entity variables have been created in scope
-    private val entityVars = mutableSetOf<String>()
+    // Maps entity name -> whether it was a "find all" (true = list, false = single)
+    private val entityVars = mutableMapOf<String, Boolean>()
+
+    // Counter for unique statement variable names
+    private var stmtCounter = 0
 
     fun generate(handler: HandlerDeclaration, eventDeclarations: Map<String, EventDeclaration>, packageName: String): String {
         entityVars.clear()
+        stmtCounter = 0
         val eventClassName = EventGen.eventClassName(handler.eventName)
         val handlerClassName = eventClassName.removeSuffix("Event") + "Handler"
 
@@ -36,7 +41,7 @@ class HandlerGen {
         sb.appendLine("    }")
         sb.appendLine()
 
-        // Helper method
+        // Helper methods
         sb.appendLine("    private fun resultSetToMap(rs: java.sql.ResultSet): Map<String, Any?> {")
         sb.appendLine("        val meta = rs.metaData")
         sb.appendLine("        val map = mutableMapOf<String, Any?>()")
@@ -45,10 +50,24 @@ class HandlerGen {
         sb.appendLine("        }")
         sb.appendLine("        return map")
         sb.appendLine("    }")
+        sb.appendLine()
+        sb.appendLine("    private fun mapToJsonObject(map: Map<String, Any?>): JsonObject = buildJsonObject {")
+        sb.appendLine("        for ((key, value) in map) {")
+        sb.appendLine("            when (value) {")
+        sb.appendLine("                is String -> put(key, value)")
+        sb.appendLine("                is Number -> put(key, value.toLong())")
+        sb.appendLine("                is Boolean -> put(key, value)")
+        sb.appendLine("                null -> put(key, JsonNull)")
+        sb.appendLine("                else -> put(key, value.toString())")
+        sb.appendLine("            }")
+        sb.appendLine("        }")
+        sb.appendLine("    }")
 
         sb.appendLine("}")
         return sb.toString()
     }
+
+    private fun nextStmtId(): Int = ++stmtCounter
 
     private fun generateStatement(sb: StringBuilder, stmt: Statement, indent: String) {
         when (stmt) {
@@ -64,22 +83,24 @@ class HandlerGen {
 
     private fun generateFind(sb: StringBuilder, stmt: FindStatement, indent: String) {
         val varName = stmt.entityName.lowercase()
-        entityVars.add(stmt.entityName)
+        val stmtId = nextStmtId()
+        val stmtVar = "stmt$stmtId"
+        entityVars[stmt.entityName] = stmt.all
 
         if (stmt.conditions.isEmpty()) {
-            sb.appendLine("${indent}val ${varName}Stmt = db.prepareStatement(\"SELECT * FROM ${stmt.entityName}\")")
+            sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"SELECT * FROM ${stmt.entityName}\")")
         } else {
             val whereParts = stmt.conditions.map { cond ->
                 "${cond.field} ${ComparisonMapper.toSql(cond.operator)} ?"
             }
             val whereClause = whereParts.joinToString(" AND ")
-            sb.appendLine("${indent}val ${varName}Stmt = db.prepareStatement(\"SELECT * FROM ${stmt.entityName} WHERE $whereClause\")")
+            sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"SELECT * FROM ${stmt.entityName} WHERE $whereClause\")")
             stmt.conditions.forEachIndexed { i, cond ->
                 val value = generateExpressionValue(cond.value)
-                sb.appendLine("${indent}${varName}Stmt.setObject(${i + 1}, $value)")
+                sb.appendLine("${indent}$stmtVar.setObject(${i + 1}, $value)")
             }
         }
-        sb.appendLine("${indent}val ${varName}Rs = ${varName}Stmt.executeQuery()")
+        sb.appendLine("${indent}val ${varName}Rs = $stmtVar.executeQuery()")
 
         if (stmt.all) {
             sb.appendLine("${indent}val ${varName}List = mutableListOf<Map<String, Any?>>()")
@@ -92,32 +113,32 @@ class HandlerGen {
 
     private fun generateCreate(sb: StringBuilder, stmt: CreateStatement, indent: String) {
         val varName = stmt.entityName.lowercase()
-        entityVars.add(stmt.entityName)
+        val stmtId = nextStmtId()
+        val stmtVar = "stmt$stmtId"
+        entityVars[stmt.entityName] = false
 
         if (stmt.forEntity != null) {
-            // "create Session for User" - insert with foreign key
             val fkColumn = "${stmt.forEntity.lowercase()}_id"
             val fkValue = "${stmt.forEntity.lowercase()}?.get(\"id\")"
-            sb.appendLine("${indent}val ${varName}Stmt = db.prepareStatement(\"INSERT INTO ${stmt.entityName} ($fkColumn) VALUES (?)\", java.sql.Statement.RETURN_GENERATED_KEYS)")
-            sb.appendLine("${indent}${varName}Stmt.setObject(1, $fkValue)")
+            sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"INSERT INTO ${stmt.entityName} ($fkColumn) VALUES (?)\", java.sql.Statement.RETURN_GENERATED_KEYS)")
+            sb.appendLine("${indent}$stmtVar.setObject(1, $fkValue)")
         } else if (stmt.assignments.isNotEmpty()) {
             val columns = stmt.assignments.joinToString(", ") { it.name }
             val placeholders = stmt.assignments.joinToString(", ") { "?" }
-            sb.appendLine("${indent}val ${varName}Stmt = db.prepareStatement(\"INSERT INTO ${stmt.entityName} ($columns) VALUES ($placeholders)\", java.sql.Statement.RETURN_GENERATED_KEYS)")
+            sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"INSERT INTO ${stmt.entityName} ($columns) VALUES ($placeholders)\", java.sql.Statement.RETURN_GENERATED_KEYS)")
             stmt.assignments.forEachIndexed { i, assign ->
                 val value = generateExpressionValue(assign.value)
-                sb.appendLine("${indent}${varName}Stmt.setObject(${i + 1}, $value)")
+                sb.appendLine("${indent}$stmtVar.setObject(${i + 1}, $value)")
             }
         } else {
-            sb.appendLine("${indent}val ${varName}Stmt = db.prepareStatement(\"INSERT INTO ${stmt.entityName} DEFAULT VALUES\", java.sql.Statement.RETURN_GENERATED_KEYS)")
+            sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"INSERT INTO ${stmt.entityName} DEFAULT VALUES\", java.sql.Statement.RETURN_GENERATED_KEYS)")
         }
 
-        sb.appendLine("${indent}${varName}Stmt.executeUpdate()")
-        sb.appendLine("${indent}val ${varName}Keys = ${varName}Stmt.generatedKeys")
+        sb.appendLine("${indent}$stmtVar.executeUpdate()")
+        sb.appendLine("${indent}val ${varName}Keys = $stmtVar.generatedKeys")
         sb.appendLine("${indent}val $varName = mutableMapOf<String, Any?>()")
         sb.appendLine("${indent}if (${varName}Keys.next()) $varName[\"id\"] = ${varName}Keys.getLong(1)")
 
-        // Add assignment values to the map for later reference
         for (assign in stmt.assignments) {
             val value = generateExpressionValue(assign.value)
             sb.appendLine("${indent}$varName[\"${assign.name}\"] = $value")
@@ -130,6 +151,8 @@ class HandlerGen {
     }
 
     private fun generateUpdate(sb: StringBuilder, stmt: UpdateStatement, indent: String) {
+        val stmtId = nextStmtId()
+        val stmtVar = "stmt$stmtId"
         val setClauses = stmt.assignments.joinToString(", ") { "${it.name} = ?" }
         val sql = if (stmt.conditions.isEmpty()) {
             "UPDATE ${stmt.entityName} SET $setClauses"
@@ -137,35 +160,37 @@ class HandlerGen {
             val whereParts = stmt.conditions.map { "${it.field} ${ComparisonMapper.toSql(it.operator)} ?" }
             "UPDATE ${stmt.entityName} SET $setClauses WHERE ${whereParts.joinToString(" AND ")}"
         }
-        sb.appendLine("${indent}val updateStmt = db.prepareStatement(\"$sql\")")
+        sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"$sql\")")
         var paramIdx = 1
         for (assign in stmt.assignments) {
             val value = generateExpressionValue(assign.value)
-            sb.appendLine("${indent}updateStmt.setObject($paramIdx, $value)")
+            sb.appendLine("${indent}$stmtVar.setObject($paramIdx, $value)")
             paramIdx++
         }
         for (cond in stmt.conditions) {
             val value = generateExpressionValue(cond.value)
-            sb.appendLine("${indent}updateStmt.setObject($paramIdx, $value)")
+            sb.appendLine("${indent}$stmtVar.setObject($paramIdx, $value)")
             paramIdx++
         }
-        sb.appendLine("${indent}updateStmt.executeUpdate()")
+        sb.appendLine("${indent}$stmtVar.executeUpdate()")
         sb.appendLine()
     }
 
     private fun generateDelete(sb: StringBuilder, stmt: DeleteStatement, indent: String) {
+        val stmtId = nextStmtId()
+        val stmtVar = "stmt$stmtId"
         val sql = if (stmt.conditions.isEmpty()) {
             "DELETE FROM ${stmt.entityName}"
         } else {
             val whereParts = stmt.conditions.map { "${it.field} ${ComparisonMapper.toSql(it.operator)} ?" }
             "DELETE FROM ${stmt.entityName} WHERE ${whereParts.joinToString(" AND ")}"
         }
-        sb.appendLine("${indent}val deleteStmt = db.prepareStatement(\"$sql\")")
+        sb.appendLine("${indent}val $stmtVar = db.prepareStatement(\"$sql\")")
         stmt.conditions.forEachIndexed { i, cond ->
             val value = generateExpressionValue(cond.value)
-            sb.appendLine("${indent}deleteStmt.setObject(${i + 1}, $value)")
+            sb.appendLine("${indent}$stmtVar.setObject(${i + 1}, $value)")
         }
-        sb.appendLine("${indent}deleteStmt.executeUpdate()")
+        sb.appendLine("${indent}$stmtVar.executeUpdate()")
         sb.appendLine()
     }
 
@@ -202,7 +227,14 @@ class HandlerGen {
     }
 
     private fun generateCondition(condition: Condition): String = when (condition) {
-        is NoResultCondition -> "${condition.entityName.lowercase()} == null"
+        is NoResultCondition -> {
+            val isAll = entityVars[condition.entityName] == true
+            if (isAll) {
+                "${condition.entityName.lowercase()}List.isEmpty()"
+            } else {
+                "${condition.entityName.lowercase()} == null"
+            }
+        }
         is ComparisonCondition -> {
             val left = generateExpressionValue(condition.left)
             val right = generateExpressionValue(condition.right)
@@ -220,9 +252,9 @@ class HandlerGen {
         is BooleanLiteral -> "${expr.value}"
         is NowLiteral -> "System.currentTimeMillis()"
         is Identifier -> {
-            // Could be an entity variable or the event
             if (expr.name in entityVars) {
-                expr.name.lowercase()
+                val isAll = entityVars[expr.name] == true
+                if (isAll) "${expr.name.lowercase()}List" else expr.name.lowercase()
             } else {
                 expr.name
             }
@@ -231,10 +263,14 @@ class HandlerGen {
             val target = expr.target
             if (target is Identifier) {
                 if (target.name in entityVars) {
-                    // Entity field access: user?.get("field")
-                    "${target.name.lowercase()}?.get(\"${expr.field}\")"
+                    val isAll = entityVars[target.name] == true
+                    if (isAll) {
+                        // List access doesn't make sense with dot — probably want a single item field
+                        "${target.name.lowercase()}List.firstOrNull()?.get(\"${expr.field}\")"
+                    } else {
+                        "${target.name.lowercase()}?.get(\"${expr.field}\")"
+                    }
                 } else {
-                    // Event field access: event.field
                     "event.${expr.field}"
                 }
             } else {
@@ -250,6 +286,29 @@ class HandlerGen {
             is NumberLiteral -> "put(\"$name\", $value)"
             is BooleanLiteral -> "put(\"$name\", $value)"
             is NowLiteral -> "put(\"$name\", $value)"
+            is Identifier -> {
+                if (expr.name in entityVars) {
+                    val isAll = entityVars[expr.name] == true
+                    if (isAll) {
+                        // Emit list of entities as a JsonArray of JsonObjects
+                        "put(\"$name\", JsonArray($value.map { mapToJsonObject(it) }))"
+                    } else {
+                        // Emit single entity as a JsonObject
+                        "put(\"$name\", $value?.let { mapToJsonObject(it) } ?: JsonObject(emptyMap()))"
+                    }
+                } else {
+                    "put(\"$name\", JsonPrimitive($value?.toString() ?: \"\"))"
+                }
+            }
+            is DotAccess -> {
+                val target = expr.target
+                if (target is Identifier && target.name in entityVars) {
+                    // Entity field access: put as primitive
+                    "put(\"$name\", JsonPrimitive($value?.toString() ?: \"\"))"
+                } else {
+                    "put(\"$name\", JsonPrimitive($value?.toString() ?: \"\"))"
+                }
+            }
             else -> "put(\"$name\", JsonPrimitive($value?.toString() ?: \"\"))"
         }
     }

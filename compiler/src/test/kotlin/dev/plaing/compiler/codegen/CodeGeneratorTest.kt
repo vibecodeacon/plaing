@@ -1203,7 +1203,7 @@ handle LOGIN_ATTEMPT:
         val code = handlerGen.generate(handler, events, "dev.plaing.generated.handler")
 
         assertTrue(code.contains("SELECT * FROM User WHERE email = ?"))
-        assertTrue(code.contains("userStmt.setObject(1, event.email)"))
+        assertTrue(code.contains(".setObject(1, event.email)"))
     }
 
     @Test
@@ -1275,6 +1275,119 @@ handle LOGIN_ATTEMPT:
 
         // stop should generate a return statement
         assertTrue(code.contains("return HandlerResult(emitted)"))
+    }
+
+    @Test
+    fun `HandlerGen uses unique stmt variable names to avoid collisions`() {
+        val source = """
+event CREATE_NOTE:
+  carries title as Text, body as Text
+
+event NOTES_UPDATED:
+  carries notes as Text
+
+handle CREATE_NOTE:
+  create Note with title = CREATE_NOTE.title, body = CREATE_NOTE.body
+  find all Note
+  emit NOTES_UPDATED with notes = Note
+""".trimIndent()
+        val handlerGen = HandlerGen()
+        val tokens = Lexer(source, "test.plaing").tokenize()
+        val program = Parser(tokens, "test.plaing").parse()
+        val handler = program.declarations.filterIsInstance<HandlerDeclaration>().first()
+        val events = program.declarations.filterIsInstance<EventDeclaration>().associateBy { it.name }
+        val code = handlerGen.generate(handler, events, "dev.plaing.generated.handler")
+
+        // Should have two different stmt variables (stmt1, stmt2)
+        assertTrue(code.contains("val stmt1 = db.prepareStatement("), "Expected stmt1 for create: $code")
+        assertTrue(code.contains("val stmt2 = db.prepareStatement("), "Expected stmt2 for find: $code")
+        // Should NOT have duplicate noteStmt
+        assertFalse(code.contains("val noteStmt"), "Should not use noteStmt pattern: $code")
+    }
+
+    @Test
+    fun `HandlerGen emits find all results as JsonArray`() {
+        val source = """
+event LOAD_NOTES:
+  carries dummy as Text
+
+event NOTES_LOADED:
+  carries notes as Text
+
+handle LOAD_NOTES:
+  find all Note
+  emit NOTES_LOADED with notes = Note
+""".trimIndent()
+        val handlerGen = HandlerGen()
+        val tokens = Lexer(source, "test.plaing").tokenize()
+        val program = Parser(tokens, "test.plaing").parse()
+        val handler = program.declarations.filterIsInstance<HandlerDeclaration>().first()
+        val events = program.declarations.filterIsInstance<EventDeclaration>().associateBy { it.name }
+        val code = handlerGen.generate(handler, events, "dev.plaing.generated.handler")
+
+        // find all should produce noteList
+        assertTrue(code.contains("noteList"), "Expected noteList variable: $code")
+        // emit should serialize as JsonArray
+        assertTrue(code.contains("JsonArray(noteList"), "Expected JsonArray serialization: $code")
+        assertTrue(code.contains("mapToJsonObject"), "Expected mapToJsonObject helper: $code")
+    }
+
+    @Test
+    fun `HandlerGen emits single entity as JsonObject`() {
+        val source = """
+event CREATE_NOTE:
+  carries title as Text
+
+event NOTE_CREATED:
+  carries note as Text
+
+handle CREATE_NOTE:
+  create Note with title = CREATE_NOTE.title
+  emit NOTE_CREATED with note = Note
+""".trimIndent()
+        val handlerGen = HandlerGen()
+        val tokens = Lexer(source, "test.plaing").tokenize()
+        val program = Parser(tokens, "test.plaing").parse()
+        val handler = program.declarations.filterIsInstance<HandlerDeclaration>().first()
+        val events = program.declarations.filterIsInstance<EventDeclaration>().associateBy { it.name }
+        val code = handlerGen.generate(handler, events, "dev.plaing.generated.handler")
+
+        // emit should serialize single entity as JsonObject
+        assertTrue(code.contains("mapToJsonObject(it)"), "Expected mapToJsonObject for single entity: $code")
+        assertFalse(code.contains("JsonPrimitive(note"), "Should not use JsonPrimitive for entity: $code")
+    }
+
+    // ---------------------------------------------------------------
+    // EventGen List type tests
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `EventGen handles List of Entity type`() {
+        val program = parseProgram("""
+event NOTES_LOADED:
+  carries notes as List of Note
+""".trimIndent())
+        val event = program.declarations.filterIsInstance<EventDeclaration>().first()
+        val eventGen = EventGen()
+        val code = eventGen.generate(event, "dev.plaing.generated.event")
+
+        assertTrue(code.contains("List<JsonObject>"), "Expected List<JsonObject> type: $code")
+        assertTrue(code.contains("jsonArray"), "Expected jsonArray extractor: $code")
+        assertFalse(code.contains("List<Long>"), "Should not be List<Long>: $code")
+    }
+
+    @Test
+    fun `EventGen handles entity ref as JsonObject`() {
+        val program = parseProgram("""
+event NOTE_CREATED:
+  carries note as Note
+""".trimIndent())
+        val event = program.declarations.filterIsInstance<EventDeclaration>().first()
+        val eventGen = EventGen()
+        val code = eventGen.generate(event, "dev.plaing.generated.event")
+
+        assertTrue(code.contains("JsonObject"), "Expected JsonObject type: $code")
+        assertTrue(code.contains("jsonObject"), "Expected jsonObject extractor: $code")
     }
 
     // ---------------------------------------------------------------

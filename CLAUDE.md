@@ -8,7 +8,7 @@ Plaing is a plain-English programming language that compiles `.plaing` files int
 # Requires JDK 21
 export JAVA_HOME=/Users/vibecody/.jdk/jdk-21.0.10+7/Contents/Home
 
-# Run all tests (184 total)
+# Run all tests (189 total)
 ./gradlew :compiler:test :runtime:jvmTest
 
 # Run compiler only (178 tests)
@@ -235,3 +235,7 @@ style login-form:
 - **Always run the full test suite** after changes: `./gradlew :compiler:test :runtime:jvmTest`
 - **The `when` block in `parseUiElement()` uses `when {}` with boolean conditions**, not `when (tokenType)`, because some elements need identifier value checks.
 - **Test helpers in CodeGeneratorTest**: use `parseProgram(source)` to parse, then cast declarations. Use `assertTrue(code.contains(...))` for assertions, not `assertContains`.
+- **HandlerGen uses numbered stmt variables** (`stmt1`, `stmt2`, etc.) to avoid name collisions when multiple operations target the same entity (e.g. `create Note` then `find all Note`).
+- **Entity variables in handlers**: `find` produces `entityName` (single) or `entityNameList` (find all). `create` produces `entityName` (mutable map). HandlerGen tracks which is which via `entityVars: Map<String, Boolean>` where `true` = list.
+- **Emitting entities in handlers**: Single entities serialize as `JsonObject` via `mapToJsonObject()`. Lists serialize as `JsonArray` of `JsonObject`. Never use `JsonPrimitive` for entity data.
+- **Event fields with entity types**: In EventGen, `carries note as Note` maps to `JsonObject` (not `Long`). `carries notes as List of Note` maps to `List<JsonObject>` (not `List<Long>`). Entity refs in events carry full entity data, not just IDs.

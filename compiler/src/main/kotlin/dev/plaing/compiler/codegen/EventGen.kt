@@ -19,7 +19,7 @@ class EventGen {
         } else {
             sb.appendLine("data class $className(")
             for ((i, field) in event.fields.withIndex()) {
-                val type = TypeMapper.toKotlinType(field.type)
+                val type = eventFieldType(field.type)
                 val comma = if (i < event.fields.size - 1) "," else ","
                 sb.appendLine("    val ${field.name}: $type$comma")
             }
@@ -59,12 +59,39 @@ class EventGen {
         return sb.toString()
     }
 
+    /**
+     * Map plaing types to Kotlin types for event fields.
+     * Entity references in events are carried as JsonObject (not Long foreign keys).
+     * Lists of entities are carried as List<JsonObject>.
+     */
+    private fun eventFieldType(type: PlaingType): String = when (type) {
+        is PlaingType.TextType -> "String"
+        is PlaingType.NumberType -> "Double"
+        is PlaingType.BooleanType -> "Boolean"
+        is PlaingType.DateType -> "Long"
+        is PlaingType.EntityRef -> "JsonObject"
+        is PlaingType.ListType -> when (type.elementType) {
+            is PlaingType.EntityRef -> "List<JsonObject>"
+            else -> "List<${eventFieldType(type.elementType)}>"
+        }
+        is PlaingType.OptionalType -> "${eventFieldType(type.innerType)}?"
+    }
+
     private fun jsonExtractor(name: String, type: PlaingType): String = when (type) {
         is PlaingType.TextType -> "payload[\"$name\"]?.jsonPrimitive?.content ?: \"\""
         is PlaingType.NumberType -> "payload[\"$name\"]?.jsonPrimitive?.double ?: 0.0"
         is PlaingType.BooleanType -> "payload[\"$name\"]?.jsonPrimitive?.boolean ?: false"
         is PlaingType.DateType -> "payload[\"$name\"]?.jsonPrimitive?.long ?: 0L"
-        is PlaingType.EntityRef -> "payload[\"$name\"]?.jsonPrimitive?.long ?: 0L"
+        is PlaingType.EntityRef -> "payload[\"$name\"]?.jsonObject ?: JsonObject(emptyMap())"
+        is PlaingType.ListType -> when (type.elementType) {
+            is PlaingType.EntityRef -> "payload[\"$name\"]?.jsonArray?.mapNotNull { it as? JsonObject } ?: emptyList()"
+            is PlaingType.TextType -> "payload[\"$name\"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()"
+            is PlaingType.NumberType -> "payload[\"$name\"]?.jsonArray?.map { it.jsonPrimitive.double } ?: emptyList()"
+            is PlaingType.BooleanType -> "payload[\"$name\"]?.jsonArray?.map { it.jsonPrimitive.boolean } ?: emptyList()"
+            else -> "payload[\"$name\"]?.jsonArray?.mapNotNull { it as? JsonObject } ?: emptyList()"
+        }
+        is PlaingType.OptionalType -> jsonExtractor(name, type.innerType).replace(" ?: ", " ?: null ?: ")
+            .let { "payload[\"$name\"]?.let { ${jsonExtractor(name, type.innerType)} }" }
         else -> "payload[\"$name\"]?.jsonPrimitive?.content ?: \"\""
     }
 
@@ -74,6 +101,13 @@ class EventGen {
         is PlaingType.BooleanType -> "put(\"$name\", $name)"
         is PlaingType.DateType -> "put(\"$name\", $name)"
         is PlaingType.EntityRef -> "put(\"$name\", $name)"
+        is PlaingType.ListType -> when (type.elementType) {
+            is PlaingType.EntityRef -> "put(\"$name\", JsonArray($name))"
+            is PlaingType.TextType -> "put(\"$name\", JsonArray($name.map { JsonPrimitive(it) }))"
+            is PlaingType.NumberType -> "put(\"$name\", JsonArray($name.map { JsonPrimitive(it) }))"
+            is PlaingType.BooleanType -> "put(\"$name\", JsonArray($name.map { JsonPrimitive(it) }))"
+            else -> "put(\"$name\", JsonArray($name))"
+        }
         else -> "put(\"$name\", $name)"
     }
 
