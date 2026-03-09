@@ -1,0 +1,15 @@
+style login-form:
+  background color is white
+  border radius is 8px
+  padding is 24px
+  max width is 400px
+
+style submit-button:
+  background color is primary
+  text color is white
+  padding is 12px 24px
+  border is none
+  border radius is 6px
+  cursor is pointer
+  on hover:
+    background color is primary-dark

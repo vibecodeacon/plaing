@@ -1,0 +1,10 @@
+handle LOGIN_ATTEMPT:
+  find User where email is LOGIN_ATTEMPT.email
+  if no User found:
+    emit LOGIN_FAILURE with message = "invalid credentials"
+    stop
+  if User.password matches LOGIN_ATTEMPT.password:
+    create Session for User
+    emit LOGIN_SUCCESS with user = User, token = Session.token
+  otherwise:
+    emit LOGIN_FAILURE with message = "invalid credentials"

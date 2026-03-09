@@ -1,0 +1,6 @@
+on LOGIN_SUCCESS:
+  store User from LOGIN_SUCCESS.user
+  navigate to Dashboard
+
+on LOGIN_FAILURE:
+  show alert LOGIN_FAILURE.message on LoginPage

@@ -1,0 +1,7 @@
+page LoginPage:
+  layout main:
+    heading "Welcome Back"
+    form login-form:
+      input username: placeholder "Email", binds to email
+      input password: placeholder "Password", type secret, binds to password
+      button "Sign In": emits LOGIN_ATTEMPT with email, password

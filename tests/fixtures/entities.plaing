@@ -1,0 +1,14 @@
+entity User:
+  name is Text, required
+  email is Text, required, unique
+  password is Text, required, hidden
+  created_at is Date, default now
+  role is Text, default "member"
+  posts is List of Post
+
+entity Post:
+  title is Text, required
+  body is Text, required
+  published is Boolean, default false
+  author is User, required
+  created_at is Date, default now

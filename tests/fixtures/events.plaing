@@ -1,0 +1,8 @@
+event LOGIN_ATTEMPT:
+  carries email as Text, password as Text
+
+event LOGIN_SUCCESS:
+  carries user as User, token as Text
+
+event LOGIN_FAILURE:
+  carries message as Text
