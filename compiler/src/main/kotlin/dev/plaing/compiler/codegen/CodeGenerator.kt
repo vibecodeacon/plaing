@@ -83,19 +83,22 @@ class CodeGenerator(private val outputDir: File) {
             generatedFiles.add(path)
         }
 
+        // Collect style names for wiring into pages
+        val styles = program.declarations.filterIsInstance<StyleDeclaration>()
+        val styleNames = styles.map { it.targetName }.toSet()
+
         // Generate page composables
         val pages = program.declarations.filterIsInstance<PageDeclaration>()
         if (pages.isNotEmpty()) {
             val pageGen = PageGen()
             for (page in pages) {
-                val code = pageGen.generate(page, "$packageBase.ui")
+                val code = pageGen.generate(page, "$packageBase.ui", styleNames)
                 val path = writeFile("kotlin/${packageBase.replace('.', '/')}/ui/${page.name}.kt", code)
                 generatedFiles.add(path)
             }
         }
 
         // Generate style modifiers
-        val styles = program.declarations.filterIsInstance<StyleDeclaration>()
         if (styles.isNotEmpty()) {
             val styleGen = StyleGen()
             for (style in styles) {

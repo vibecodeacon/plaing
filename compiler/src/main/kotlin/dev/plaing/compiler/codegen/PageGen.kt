@@ -3,8 +3,9 @@ package dev.plaing.compiler.codegen
 import dev.plaing.compiler.parser.*
 
 class PageGen {
-    fun generate(page: PageDeclaration, packageName: String): String {
+    fun generate(page: PageDeclaration, packageName: String, styleNames: Set<String> = emptySet()): String {
         val boundFields = collectBoundFields(page.body)
+        val hasStyles = styleNames.isNotEmpty()
 
         val sb = StringBuilder()
         sb.appendLine("package $packageName")
@@ -21,6 +22,10 @@ class PageGen {
         sb.appendLine("import kotlinx.serialization.json.buildJsonObject")
         sb.appendLine("import kotlinx.serialization.json.put")
         sb.appendLine("import kotlinx.serialization.json.jsonPrimitive")
+        if (hasStyles) {
+            val stylePackage = packageName.substringBeforeLast('.') + ".style"
+            sb.appendLine("import ${stylePackage}.*")
+        }
         sb.appendLine()
         sb.appendLine("@Composable")
         sb.appendLine("fun ${page.name}(")
@@ -37,7 +42,7 @@ class PageGen {
 
         // Generate UI tree
         for (element in page.body) {
-            generateElement(sb, element, "    ", boundFields)
+            generateElement(sb, element, "    ", boundFields, styleNames)
         }
 
         // Alert at the end
@@ -48,15 +53,21 @@ class PageGen {
         return sb.toString()
     }
 
-    private fun generateElement(sb: StringBuilder, element: UiElement, indent: String, boundFields: Set<String>) {
+    private fun generateElement(sb: StringBuilder, element: UiElement, indent: String, boundFields: Set<String>, styleNames: Set<String>) {
         when (element) {
             is LayoutElement -> {
+                val styleFn = styleFunction(element.name, styleNames)
+                val modifierChain = if (styleFn != null) {
+                    "modifier.fillMaxSize().padding(16.dp).$styleFn()"
+                } else {
+                    "modifier.fillMaxSize().padding(16.dp)"
+                }
                 sb.appendLine("${indent}Column(")
-                sb.appendLine("${indent}    modifier = modifier.fillMaxSize().padding(16.dp),")
+                sb.appendLine("${indent}    modifier = $modifierChain,")
                 sb.appendLine("${indent}    horizontalAlignment = Alignment.CenterHorizontally,")
                 sb.appendLine("${indent}) {")
                 for (child in element.children) {
-                    generateElement(sb, child, "$indent    ", boundFields)
+                    generateElement(sb, child, "$indent    ", boundFields, styleNames)
                 }
                 sb.appendLine("${indent}}")
             }
@@ -64,11 +75,17 @@ class PageGen {
                 sb.appendLine("${indent}PlaingHeading(\"${element.text}\")")
             }
             is FormElement -> {
+                val styleFn = styleFunction(element.name, styleNames)
+                val modifierChain = if (styleFn != null) {
+                    "Modifier.widthIn(max = 400.dp).$styleFn()"
+                } else {
+                    "Modifier.widthIn(max = 400.dp)"
+                }
                 sb.appendLine("${indent}Column(")
-                sb.appendLine("${indent}    modifier = Modifier.widthIn(max = 400.dp),")
+                sb.appendLine("${indent}    modifier = $modifierChain,")
                 sb.appendLine("${indent}) {")
                 for (child in element.children) {
-                    generateElement(sb, child, "$indent    ", boundFields)
+                    generateElement(sb, child, "$indent    ", boundFields, styleNames)
                 }
                 sb.appendLine("${indent}}")
             }
@@ -104,6 +121,7 @@ class PageGen {
                 sb.appendLine("${indent}}")
             }
             is ButtonElement -> {
+                val styleFn = styleFunction(element.text.lowercase().replace(" ", "-"), styleNames)
                 sb.appendLine("${indent}PlaingButton(")
                 sb.appendLine("${indent}    text = \"${element.text}\",")
                 if (element.action != null) {
@@ -118,9 +136,23 @@ class PageGen {
                 } else {
                     sb.appendLine("${indent}    onClick = {},")
                 }
+                if (styleFn != null) {
+                    sb.appendLine("${indent}    modifier = Modifier.$styleFn(),")
+                }
                 sb.appendLine("${indent})")
             }
         }
+    }
+
+    /**
+     * Convert a hyphenated element name (e.g. "login-form") to the corresponding
+     * style function name (e.g. "loginFormStyle") if a matching style exists.
+     */
+    private fun styleFunction(elementName: String, styleNames: Set<String>): String? {
+        if (elementName !in styleNames) return null
+        return elementName.split("-").mapIndexed { i, part ->
+            if (i == 0) part.lowercase() else part.replaceFirstChar { it.uppercase() }
+        }.joinToString("") + "Style"
     }
 
     private fun generateTextValue(expr: Expression): String = when (expr) {

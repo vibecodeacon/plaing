@@ -1830,6 +1830,68 @@ page TestPage:
         assertTrue(code.contains("import kotlinx.serialization.json.jsonPrimitive"))
     }
 
+    // ---------------------------------------------------------------
+    // Style wiring: styles apply to matching page elements
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `PageGen applies matching style to form element`() {
+        val program = parseProgram("""
+page LoginPage:
+  layout main:
+    form login-form:
+      input email: placeholder "Email", binds to email
+      button "Sign In": emits LOGIN_ATTEMPT with email
+
+style login-form:
+  background color is white
+  border radius is 8px
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val styles = program.declarations.filterIsInstance<StyleDeclaration>()
+        val styleNames = styles.map { it.targetName }.toSet()
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui", styleNames)
+        assertTrue(code.contains(".loginFormStyle()"), "Form should have loginFormStyle() applied")
+        assertTrue(code.contains("import dev.plaing.generated.style.*"), "Should import style package")
+    }
+
+    @Test
+    fun `PageGen applies matching style to layout element`() {
+        val program = parseProgram("""
+page HomePage:
+  layout main:
+    heading "Hello"
+
+style main:
+  padding is 24px
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val styles = program.declarations.filterIsInstance<StyleDeclaration>()
+        val styleNames = styles.map { it.targetName }.toSet()
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui", styleNames)
+        assertTrue(code.contains(".mainStyle()"), "Layout should have mainStyle() applied")
+    }
+
+    @Test
+    fun `PageGen does not apply style when no matching style exists`() {
+        val program = parseProgram("""
+page LoginPage:
+  layout main:
+    form login-form:
+      input email: placeholder "Email", binds to email
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui", emptySet())
+        assertFalse(code.contains("Style()"), "No style functions should be applied")
+        assertFalse(code.contains("import dev.plaing.generated.style.*"), "Should not import style package")
+    }
+
     @Suppress("DEPRECATION")
     private fun createTempDir(prefix: String): File = kotlin.io.createTempDir(prefix)
 }
