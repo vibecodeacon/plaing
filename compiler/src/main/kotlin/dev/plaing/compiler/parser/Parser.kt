@@ -436,12 +436,14 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
     }
 
     private fun parseUiElement(): UiElement {
-        return when (current().type) {
-            TokenType.LAYOUT -> parseLayoutElement()
-            TokenType.HEADING -> parseHeadingElement()
-            TokenType.FORM -> parseFormElement()
-            TokenType.INPUT -> parseInputElement()
-            TokenType.BUTTON -> parseButtonElement()
+        return when {
+            check(TokenType.LAYOUT) -> parseLayoutElement()
+            check(TokenType.HEADING) -> parseHeadingElement()
+            check(TokenType.FORM) -> parseFormElement()
+            check(TokenType.INPUT) -> parseInputElement()
+            check(TokenType.BUTTON) -> parseButtonElement()
+            check(TokenType.IDENTIFIER) && current().value == "list" -> parseListElement()
+            check(TokenType.IDENTIFIER) && current().value == "text" -> parseTextElement()
             else -> throw ParseException(
                 "Expected UI element but found '${current().value}'",
                 current().line, current().column, fileName
@@ -534,6 +536,40 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
         return ButtonAction(eventName, arguments, location)
     }
 
+    // --- Text element ---
+    // text "static string" OR text Entity.field
+    private fun parseTextElement(): TextElement {
+        val location = loc()
+        advance() // consume "text" identifier
+        val value = parseExpression()
+        return TextElement(value, location)
+    }
+
+    // --- List element ---
+    // list notes: each Note show Note.title, Note.body
+    private fun parseListElement(): ListElement {
+        val location = loc()
+        advance() // consume "list" identifier
+        val name = expect(TokenType.IDENTIFIER).value
+        expect(TokenType.COLON)
+        expect(TokenType.EACH)
+        val entityName = expect(TokenType.IDENTIFIER).value
+        expect(TokenType.SHOW)
+
+        val fields = mutableListOf<String>()
+        // Parse Entity.field references
+        expect(TokenType.IDENTIFIER) // skip entity name prefix
+        expect(TokenType.DOT)
+        fields.add(expect(TokenType.IDENTIFIER).value)
+        while (match(TokenType.COMMA)) {
+            expect(TokenType.IDENTIFIER) // skip entity name prefix
+            expect(TokenType.DOT)
+            fields.add(expect(TokenType.IDENTIFIER).value)
+        }
+
+        return ListElement(name, entityName, fields, location)
+    }
+
     // --- Reaction ---
 
     private fun parseReaction(): ReactionDeclaration {
@@ -558,10 +594,17 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
         val location = loc()
         return when {
             match(TokenType.STORE) -> {
-                val entityName = expect(TokenType.IDENTIFIER).value
-                expect(TokenType.FROM)
-                val from = parseExpression()
-                StoreAction(entityName, from, location)
+                if (match(TokenType.ALL)) {
+                    val entityName = expect(TokenType.IDENTIFIER).value
+                    expect(TokenType.FROM)
+                    val from = parseExpression()
+                    StoreAllAction(entityName, from, location)
+                } else {
+                    val entityName = expect(TokenType.IDENTIFIER).value
+                    expect(TokenType.FROM)
+                    val from = parseExpression()
+                    StoreAction(entityName, from, location)
+                }
             }
             match(TokenType.NAVIGATE) -> {
                 expect(TokenType.TO)

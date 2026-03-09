@@ -249,6 +249,18 @@ data class InputElement(
     override val location: SourceLocation
 ) : UiElement()
 
+data class TextElement(
+    val value: Expression,
+    override val location: SourceLocation
+) : UiElement()
+
+data class ListElement(
+    val name: String,
+    val entityName: String,
+    val fields: List<String>,
+    override val location: SourceLocation
+) : UiElement()
+
 data class ButtonElement(
     val text: String,
     val action: ButtonAction?,
@@ -278,6 +290,12 @@ sealed class ReactionAction {
 }
 
 data class StoreAction(
+    val entityName: String,
+    val from: Expression,
+    override val location: SourceLocation
+) : ReactionAction()
+
+data class StoreAllAction(
     val entityName: String,
     val from: Expression,
     override val location: SourceLocation

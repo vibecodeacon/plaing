@@ -81,7 +81,13 @@ delete Session where expires_at is before now
 
 ### Page Elements
 
-`layout`, `heading`, `form`, `input`, `button`
+`layout`, `heading`, `form`, `input`, `button`, `text`, `list`
+
+```
+text "Hello"                                     # static text
+text User.name                                   # display entity field
+list notes: each Note show Note.title, Note.body  # scrollable list from state
+```
 
 ### Input Properties
 
@@ -89,7 +95,7 @@ delete Session where expires_at is before now
 
 ### Reaction Actions
 
-`store Entity from Event.field`, `navigate to PageName`, `show alert Event.message on PageName`
+`store Entity from Event.field`, `store all Entity from Event.field` (collections), `navigate to PageName`, `show alert Event.message on PageName`
 
 ### Styles
 
@@ -155,7 +161,7 @@ This is v0 — a working proof of concept. The compiler and runtime are function
 - SQLite database with generated repositories
 - Compose Multiplatform UI generation
 - CLI with `new`, `build`, `dev`, `parse` commands
-- 171 passing tests
+- 184 passing tests
 
 What's not done yet: `plaing run` (compile + launch), runtime error messages in plain English, more UI elements, validation rules, permissions, pagination. See [Contributing](#contributing) if any of that interests you.
 

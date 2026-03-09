@@ -1005,4 +1005,156 @@ handle TEST:
         val program = parse("")
         assertEquals(0, program.declarations.size)
     }
+
+    // ---------------------------------------------------------------
+    // Text element tests
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `parses text element with string literal`() {
+        val program = parse("""
+page TestPage:
+  layout main:
+    text "Hello World"
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val textEl = layout.children[0] as TextElement
+        assertTrue(textEl.value is StringLiteral)
+        assertEquals("Hello World", (textEl.value as StringLiteral).value)
+    }
+
+    @Test
+    fun `parses text element with dot access`() {
+        val program = parse("""
+page TestPage:
+  layout main:
+    text User.name
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val textEl = layout.children[0] as TextElement
+        assertTrue(textEl.value is DotAccess)
+        assertEquals("name", (textEl.value as DotAccess).field)
+    }
+
+    @Test
+    fun `text keyword does not conflict with text field in entity`() {
+        val program = parse("""
+entity Comment:
+  text is Text
+  author is Text
+""".trimIndent())
+        val entity = program.declarations[0] as EntityDeclaration
+        assertEquals("text", entity.fields[0].name)
+        assertEquals(PlaingType.TextType, entity.fields[0].type)
+    }
+
+    // ---------------------------------------------------------------
+    // List element tests
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `parses list element with single field`() {
+        val program = parse("""
+page TestPage:
+  layout main:
+    list items: each Note show Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val listEl = layout.children[0] as ListElement
+        assertEquals("items", listEl.name)
+        assertEquals("Note", listEl.entityName)
+        assertEquals(listOf("title"), listEl.fields)
+    }
+
+    @Test
+    fun `parses list element with multiple fields`() {
+        val program = parse("""
+page TestPage:
+  layout main:
+    list notes: each Note show Note.title, Note.body
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val listEl = layout.children[0] as ListElement
+        assertEquals("notes", listEl.name)
+        assertEquals("Note", listEl.entityName)
+        assertEquals(listOf("title", "body"), listEl.fields)
+    }
+
+    // ---------------------------------------------------------------
+    // Store all reaction tests
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `parses store all reaction`() {
+        val program = parse("""
+on NOTES_LOADED:
+  store all Notes from NOTES_LOADED.notes
+""".trimIndent())
+        val reaction = program.declarations[0] as ReactionDeclaration
+        val action = reaction.actions[0] as StoreAllAction
+        assertEquals("Notes", action.entityName)
+        assertTrue(action.from is DotAccess)
+    }
+
+    @Test
+    fun `parses store all alongside regular store`() {
+        val program = parse("""
+on DATA_LOADED:
+  store User from DATA_LOADED.user
+  store all Notes from DATA_LOADED.notes
+""".trimIndent())
+        val reaction = program.declarations[0] as ReactionDeclaration
+        assertTrue(reaction.actions[0] is StoreAction)
+        assertTrue(reaction.actions[1] is StoreAllAction)
+    }
+
+    // ---------------------------------------------------------------
+    // Full notes app test
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `parses a complete notes app`() {
+        val program = parse("""
+entity Note:
+  title is Text, required
+  body is Text, required
+  created_at is Date, default now
+
+event CREATE_NOTE:
+  carries title as Text, body as Text
+
+event NOTE_CREATED:
+  carries note as Note
+
+event NOTES_LOADED:
+  carries notes as Text
+
+page NotesPage:
+  layout main:
+    heading "My Notes"
+    list notes: each Note show Note.title, Note.body
+    form new-note:
+      input title: placeholder "Title", binds to title
+      input body: placeholder "Write your note...", binds to body
+      button "Save": emits CREATE_NOTE with title, body
+
+on NOTE_CREATED:
+  store all Notes from NOTE_CREATED.notes
+""".trimIndent())
+
+        val entities = program.declarations.filterIsInstance<EntityDeclaration>()
+        val events = program.declarations.filterIsInstance<EventDeclaration>()
+        val pages = program.declarations.filterIsInstance<PageDeclaration>()
+        val reactions = program.declarations.filterIsInstance<ReactionDeclaration>()
+
+        assertEquals(1, entities.size)
+        assertEquals(3, events.size)
+        assertEquals(1, pages.size)
+        assertEquals(1, reactions.size)
+        assertEquals("Note", entities[0].name)
+    }
 }

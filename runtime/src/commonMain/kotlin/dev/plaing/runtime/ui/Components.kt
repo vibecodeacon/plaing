@@ -69,6 +69,53 @@ fun PlaingButton(
 }
 
 /**
+ * Standard text display component.
+ */
+@Composable
+fun PlaingText(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        modifier = modifier.padding(vertical = 2.dp),
+    )
+}
+
+/**
+ * List item card for displaying entity data.
+ */
+@Composable
+fun PlaingListItem(
+    fields: Map<String, String>,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            var first = true
+            for ((_, value) in fields) {
+                if (first) {
+                    Text(
+                        text = value,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                    first = false
+                } else {
+                    Text(
+                        text = value,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Alert/notification display.
  */
 @Composable

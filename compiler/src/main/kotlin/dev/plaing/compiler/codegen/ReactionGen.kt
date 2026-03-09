@@ -33,6 +33,10 @@ class ReactionGen {
                 val fromExpr = generateFromExpression(action.from)
                 sb.appendLine("${indent}stateStore.storeEntity(\"${action.entityName}\", $fromExpr)")
             }
+            is StoreAllAction -> {
+                val fromExpr = generateListFromExpression(action.from)
+                sb.appendLine("${indent}stateStore.storeEntityList(\"${action.entityName}\", $fromExpr)")
+            }
             is NavigateAction -> {
                 sb.appendLine("${indent}stateStore.navigateTo(\"${action.targetPage}\")")
             }
@@ -55,6 +59,21 @@ class ReactionGen {
             }
             is Identifier -> "envelope.payload[\"${expr.name}\"]?.jsonObject ?: buildJsonObject {}"
             else -> "buildJsonObject {}"
+        }
+    }
+
+    private fun generateListFromExpression(expr: Expression): String {
+        return when (expr) {
+            is DotAccess -> {
+                val target = expr.target
+                if (target is Identifier) {
+                    "envelope.payload[\"${expr.field}\"]?.jsonArray?.mapNotNull { it as? JsonObject } ?: emptyList()"
+                } else {
+                    "envelope.payload[\"${expr.field}\"]?.jsonArray?.mapNotNull { it as? JsonObject } ?: emptyList()"
+                }
+            }
+            is Identifier -> "envelope.payload[\"${expr.name}\"]?.jsonArray?.mapNotNull { it as? JsonObject } ?: emptyList()"
+            else -> "emptyList()"
         }
     }
 

@@ -10,6 +10,7 @@ class PageGen {
         sb.appendLine("package $packageName")
         sb.appendLine()
         sb.appendLine("import androidx.compose.foundation.layout.*")
+        sb.appendLine("import androidx.compose.foundation.lazy.*")
         sb.appendLine("import androidx.compose.material3.*")
         sb.appendLine("import androidx.compose.runtime.*")
         sb.appendLine("import androidx.compose.ui.Alignment")
@@ -19,6 +20,7 @@ class PageGen {
         sb.appendLine("import dev.plaing.runtime.state.StateStore")
         sb.appendLine("import kotlinx.serialization.json.buildJsonObject")
         sb.appendLine("import kotlinx.serialization.json.put")
+        sb.appendLine("import kotlinx.serialization.json.jsonPrimitive")
         sb.appendLine()
         sb.appendLine("@Composable")
         sb.appendLine("fun ${page.name}(")
@@ -85,6 +87,22 @@ class PageGen {
                 }
                 sb.appendLine("${indent})")
             }
+            is TextElement -> {
+                val textValue = generateTextValue(element.value)
+                sb.appendLine("${indent}PlaingText($textValue)")
+            }
+            is ListElement -> {
+                sb.appendLine("${indent}val ${element.name} = stateStore.getEntityList(\"${element.entityName}\")")
+                sb.appendLine("${indent}LazyColumn {")
+                sb.appendLine("${indent}    items(${element.name}) { item ->")
+                sb.appendLine("${indent}        PlaingListItem(mapOf(")
+                for (field in element.fields) {
+                    sb.appendLine("${indent}            \"$field\" to (item[\"$field\"]?.jsonPrimitive?.content ?: \"\"),")
+                }
+                sb.appendLine("${indent}        ))")
+                sb.appendLine("${indent}    }")
+                sb.appendLine("${indent}}")
+            }
             is ButtonElement -> {
                 sb.appendLine("${indent}PlaingButton(")
                 sb.appendLine("${indent}    text = \"${element.text}\",")
@@ -103,6 +121,20 @@ class PageGen {
                 sb.appendLine("${indent})")
             }
         }
+    }
+
+    private fun generateTextValue(expr: Expression): String = when (expr) {
+        is StringLiteral -> "\"${expr.value}\""
+        is DotAccess -> {
+            val target = expr.target
+            if (target is Identifier) {
+                "stateStore.getEntity(\"${target.name}\")?.get(\"${expr.field}\")?.jsonPrimitive?.content ?: \"\""
+            } else {
+                "\"\""
+            }
+        }
+        is Identifier -> "stateStore.getEntity(\"${expr.name}\")?.toString() ?: \"\""
+        else -> "\"\""
     }
 
     private fun collectBoundFields(elements: List<UiElement>): Set<String> {

@@ -32,7 +32,7 @@ enum class TokenType {
 
     // Keywords - UI
     LAYOUT, HEADING, FORM, INPUT, BUTTON, EMITS, BINDS, TO,
-    PLACEHOLDER, TYPE,
+    PLACEHOLDER, TYPE, EACH,
 
     // Keywords - field modifiers
     DEFAULT, REQUIRED, UNIQUE, HIDDEN,
@@ -106,6 +106,7 @@ class Lexer(private val source: String, private val fileName: String = "") {
         "to" to TokenType.TO,
         "placeholder" to TokenType.PLACEHOLDER,
         "type" to TokenType.TYPE,
+        "each" to TokenType.EACH,
         "default" to TokenType.DEFAULT,
         "required" to TokenType.REQUIRED,
         "unique" to TokenType.UNIQUE,

@@ -1636,6 +1636,87 @@ style login-form:
         }
     }
 
+    // ---------------------------------------------------------------
+    // 14. Text and List element codegen tests
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `PageGen generates text element with string literal`() {
+        val program = parseProgram("""
+page TestPage:
+  layout main:
+    text "Hello World"
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("PlaingText(\"Hello World\")"))
+    }
+
+    @Test
+    fun `PageGen generates text element with entity reference`() {
+        val program = parseProgram("""
+page TestPage:
+  layout main:
+    text User.name
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("PlaingText("))
+        assertTrue(code.contains("stateStore.getEntity(\"User\")"))
+        assertTrue(code.contains("\"name\""))
+    }
+
+    @Test
+    fun `PageGen generates list element`() {
+        val program = parseProgram("""
+page TestPage:
+  layout main:
+    list notes: each Note show Note.title, Note.body
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("stateStore.getEntityList(\"Note\")"))
+        assertTrue(code.contains("LazyColumn"))
+        assertTrue(code.contains("PlaingListItem"))
+        assertTrue(code.contains("\"title\""))
+        assertTrue(code.contains("\"body\""))
+    }
+
+    @Test
+    fun `ReactionGen generates store all action`() {
+        val program = parseProgram("""
+on NOTES_LOADED:
+  store all Notes from NOTES_LOADED.notes
+""".trimIndent())
+        val reaction = program.declarations[0] as ReactionDeclaration
+
+        val reactionGen = ReactionGen()
+        val code = reactionGen.generate(listOf(reaction), "dev.plaing.generated.reaction")
+        assertTrue(code.contains("storeEntityList(\"Notes\""))
+        assertTrue(code.contains("jsonArray"))
+    }
+
+    @Test
+    fun `PageGen generates imports for list and json`() {
+        val program = parseProgram("""
+page TestPage:
+  layout main:
+    list items: each Note show Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("import androidx.compose.foundation.lazy.*"))
+        assertTrue(code.contains("import kotlinx.serialization.json.jsonPrimitive"))
+    }
+
     @Suppress("DEPRECATION")
     private fun createTempDir(prefix: String): File = kotlin.io.createTempDir(prefix)
 }

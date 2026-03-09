@@ -122,7 +122,20 @@ page LoginPage:
       input username: placeholder "Email", binds to email
       input password: placeholder "Password", type secret, binds to password
       button "Sign In": emits LOGIN_ATTEMPT with email, password
+
+page NotesPage:
+  layout main:
+    heading "My Notes"
+    text User.name
+    list notes: each Note show Note.title, Note.body
+    form new-note:
+      input title: placeholder "Title", binds to title
+      button "Save": emits CREATE_NOTE with title
 ```
+
+UI elements: `layout`, `heading`, `form`, `input`, `button`, `text`, `list`.
+- `text "string"` or `text Entity.field` — displays a value
+- `list name: each Entity show Entity.field1, Entity.field2` — renders a scrollable list from StateStore
 
 ### Reactions (client-side event responses)
 ```
@@ -132,7 +145,12 @@ on LOGIN_SUCCESS:
 
 on LOGIN_FAILURE:
   show alert LOGIN_FAILURE.message on LoginPage
+
+on NOTES_LOADED:
+  store all Notes from NOTES_LOADED.notes
 ```
+
+Actions: `store Entity from`, `store all Entity from` (collections), `navigate to`, `show alert`.
 
 ### Styles (CSS with plain English)
 ```
