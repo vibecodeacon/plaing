@@ -158,10 +158,11 @@ page NotesPage:
   layout main:
     heading "My Notes"
     text User.name
-    list notes: each Note show Note.title, Note.body
-    form new-note:
-      input title: placeholder "Title", binds to title
-      button "Save": emits CREATE_NOTE with title
+    list notes: each Note show Note.title, Note.body, on click select Note
+    form edit-note:
+      input title: placeholder "Title", binds to title, fills from Note.title
+      input body: placeholder "Body", binds to body, fills from Note.body
+      button "Save": emits UPDATE_NOTE with title, body
 ```
 
 UI elements and where they're implemented:
@@ -174,7 +175,7 @@ UI elements and where they're implemented:
 | `input` | `input name: props` | `InputElement` | `parseInputElement()` | `PageGen` → `PlaingInput` | `Components.kt` |
 | `button` | `button "text": action` | `ButtonElement` | `parseButtonElement()` | `PageGen` → `PlaingButton` | `Components.kt` |
 | `text` | `text "str"` / `text E.f` | `TextElement` | contextual keyword* | `PageGen` → `PlaingText` | `Components.kt` |
-| `list` | `list n: each E show E.f` | `ListElement` | contextual keyword* | `PageGen` → `LazyColumn` | `Components.kt` |
+| `list` | `list n: each E show E.f[, on click select E]` | `ListElement` | contextual keyword* | `PageGen` → `LazyColumn` | `Components.kt` |
 
 *See "Contextual Keywords" section above.
 
@@ -198,6 +199,32 @@ on NOTES_LOADED:
 | Navigate | `navigate to Page` | `NavigateAction` | `navigateTo()` |
 | Show alert | `show alert expr on Page` | `ShowAlertAction` | `showAlert()` |
 
+### Input Properties
+
+| Property | Syntax | AST Node | Purpose |
+|----------|--------|----------|---------|
+| Placeholder | `placeholder "text"` | `InputProperty.Placeholder` | Input hint text |
+| Type | `type secret` | `InputProperty.Type` | Password masking |
+| Binds to | `binds to fieldname` | `InputProperty.BindsTo` | Two-way binding to local state var |
+| Fills from | `fills from Entity.field` | `InputProperty.FillsFrom` | Populate from selected entity |
+
+`fills from` works with list selection: when a list has `on click select Entity`, clicking an item stores it in `StateStore.selectEntity()`. Inputs with `fills from Entity.field` use `LaunchedEffect` to read the selected entity's field via `StateStore.getSelectedEntity()`.
+
+### List Selection
+
+Lists can be made clickable with `on click select Entity`:
+```
+list notes: each Note show Note.title, Note.body, on click select Note
+```
+
+This generates a `PlaingListItem` with an `onClick` callback that calls `stateStore.selectEntity("Note", item)`. The selected entity can then be read by inputs using `fills from Note.title`.
+
+The full select → edit flow:
+1. `on click select Note` — stores clicked item in `StateStore.selectedEntities`
+2. `fills from Note.title` — populates input field from selected entity via `LaunchedEffect`
+3. `binds to title` — two-way binding lets user edit the value
+4. `button "Save": emits UPDATE_NOTE with title` — sends updated data to server
+
 ### Styles (CSS with plain English)
 ```
 style login-form:
@@ -215,7 +242,7 @@ style login-form:
 - **Compilation**: .plaing → Lexer → Parser → AST → CodeGenerator → Kotlin source files
 - **Runtime**: Ktor Netty (server), Ktor CIO (client), Compose Multiplatform (UI), SQLite/JDBC (DB)
 - **No raw SQL in .plaing**: Data operations use `find`, `create`, `update`, `delete` with plain English
-- **StateStore**: Holds single entities (`storeEntity`/`getEntity`) AND collections (`storeEntityList`/`getEntityList`/`addToEntityList`). Collections use `mutableStateListOf` for Compose reactivity.
+- **StateStore**: Holds single entities (`storeEntity`/`getEntity`), collections (`storeEntityList`/`getEntityList`/`addToEntityList`), and selected entities (`selectEntity`/`getSelectedEntity`/`clearSelection`). Collections use `mutableStateListOf` for Compose reactivity.
 
 ## Key Conventions
 

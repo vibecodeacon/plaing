@@ -88,9 +88,12 @@ fun PlaingText(
 @Composable
 fun PlaingListItem(
     fields: Map<String, String>,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Card(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {

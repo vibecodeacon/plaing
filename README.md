@@ -87,11 +87,18 @@ delete Session where expires_at is before now
 text "Hello"                                     # static text
 text User.name                                   # display entity field
 list notes: each Note show Note.title, Note.body  # scrollable list from state
+list notes: each Note show Note.title, on click select Note  # clickable list
 ```
 
 ### Input Properties
 
-`placeholder "text"`, `type secret`, `binds to fieldname`
+`placeholder "text"`, `type secret`, `binds to fieldname`, `fills from Entity.field`
+
+```
+input title: placeholder "Title", binds to title, fills from Note.title
+```
+
+`fills from` populates the input from a selected entity. Use with `on click select` on a list to enable select → edit flows.
 
 ### Reaction Actions
 

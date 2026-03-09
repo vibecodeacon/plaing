@@ -16,6 +16,7 @@ class StateStore {
 
     private val entities = mutableMapOf<String, JsonObject>()
     private val entityLists = mutableMapOf<String, MutableList<JsonObject>>()
+    private val selectedEntities = mutableMapOf<String, JsonObject?>()
 
     fun storeEntity(name: String, data: JsonObject) {
         entities[name] = data
@@ -35,6 +36,16 @@ class StateStore {
     }
 
     fun getEntityList(name: String): List<JsonObject> = entityLists[name] ?: emptyList()
+
+    fun selectEntity(name: String, data: JsonObject) {
+        selectedEntities[name] = data
+    }
+
+    fun clearSelection(name: String) {
+        selectedEntities[name] = null
+    }
+
+    fun getSelectedEntity(name: String): JsonObject? = selectedEntities[name]
 
     fun navigateTo(page: String) {
         currentPage = page

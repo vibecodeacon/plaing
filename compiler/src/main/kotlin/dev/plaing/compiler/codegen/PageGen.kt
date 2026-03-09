@@ -93,7 +93,18 @@ class PageGen {
                 val placeholder = element.properties.filterIsInstance<InputProperty.Placeholder>().firstOrNull()?.text ?: ""
                 val isSecret = element.properties.filterIsInstance<InputProperty.Type>().any { it.typeName == "secret" }
                 val bindField = element.properties.filterIsInstance<InputProperty.BindsTo>().firstOrNull()?.field
+                val fillsFrom = element.properties.filterIsInstance<InputProperty.FillsFrom>().firstOrNull()
                 val stateVar = bindField ?: element.name
+
+                if (fillsFrom != null) {
+                    // Initialize the bound field from the selected entity when it changes
+                    sb.appendLine("${indent}LaunchedEffect(stateStore.getSelectedEntity(\"${fillsFrom.entityName}\")) {")
+                    sb.appendLine("${indent}    val selected = stateStore.getSelectedEntity(\"${fillsFrom.entityName}\")")
+                    sb.appendLine("${indent}    if (selected != null) {")
+                    sb.appendLine("${indent}        $stateVar = selected[\"${fillsFrom.fieldName}\"]?.jsonPrimitive?.content ?: \"\"")
+                    sb.appendLine("${indent}    }")
+                    sb.appendLine("${indent}}")
+                }
 
                 sb.appendLine("${indent}PlaingInput(")
                 sb.appendLine("${indent}    value = $stateVar,")
@@ -112,11 +123,16 @@ class PageGen {
                 sb.appendLine("${indent}val ${element.name} = stateStore.getEntityList(\"${element.entityName}\")")
                 sb.appendLine("${indent}LazyColumn {")
                 sb.appendLine("${indent}    items(${element.name}) { item ->")
-                sb.appendLine("${indent}        PlaingListItem(mapOf(")
+                sb.appendLine("${indent}        PlaingListItem(")
+                sb.appendLine("${indent}            fields = mapOf(")
                 for (field in element.fields) {
-                    sb.appendLine("${indent}            \"$field\" to (item[\"$field\"]?.jsonPrimitive?.content ?: \"\"),")
+                    sb.appendLine("${indent}                \"$field\" to (item[\"$field\"]?.jsonPrimitive?.content ?: \"\"),")
                 }
-                sb.appendLine("${indent}        ))")
+                sb.appendLine("${indent}            ),")
+                if (element.onClickSelect != null) {
+                    sb.appendLine("${indent}            onClick = { stateStore.selectEntity(\"${element.onClickSelect}\", item) },")
+                }
+                sb.appendLine("${indent}        )")
                 sb.appendLine("${indent}    }")
                 sb.appendLine("${indent}}")
             }

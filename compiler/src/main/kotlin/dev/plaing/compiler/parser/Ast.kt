@@ -258,6 +258,7 @@ data class ListElement(
     val name: String,
     val entityName: String,
     val fields: List<String>,
+    val onClickSelect: String? = null,
     override val location: SourceLocation
 ) : UiElement()
 
@@ -273,6 +274,7 @@ sealed class InputProperty {
     data class Placeholder(val text: String) : InputProperty()
     data class Type(val typeName: String) : InputProperty()
     data class BindsTo(val field: String) : InputProperty()
+    data class FillsFrom(val entityName: String, val fieldName: String) : InputProperty()
 }
 
 // --- Button Action ---

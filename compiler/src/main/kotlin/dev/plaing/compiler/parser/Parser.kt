@@ -500,6 +500,13 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
             match(TokenType.PLACEHOLDER) -> InputProperty.Placeholder(expect(TokenType.STRING_LITERAL).value)
             match(TokenType.TYPE) -> InputProperty.Type(expect(TokenType.IDENTIFIER).value)
             match(TokenType.BINDS) -> { expect(TokenType.TO); InputProperty.BindsTo(expect(TokenType.IDENTIFIER).value) }
+            match(TokenType.FILLS) -> {
+                expect(TokenType.FROM)
+                val entityName = expect(TokenType.IDENTIFIER).value
+                expect(TokenType.DOT)
+                val fieldName = expect(TokenType.IDENTIFIER).value
+                InputProperty.FillsFrom(entityName, fieldName)
+            }
             else -> throw ParseException(
                 "Expected input property but found '${current().value}'",
                 current().line, current().column, fileName
@@ -547,6 +554,7 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
 
     // --- List element ---
     // list notes: each Note show Note.title, Note.body
+    // list notes: each Note show Note.title, Note.body, on click select Note
     private fun parseListElement(): ListElement {
         val location = loc()
         advance() // consume "list" identifier
@@ -561,13 +569,23 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
         expect(TokenType.IDENTIFIER) // skip entity name prefix
         expect(TokenType.DOT)
         fields.add(expect(TokenType.IDENTIFIER).value)
+
+        var onClickSelect: String? = null
         while (match(TokenType.COMMA)) {
+            // Check for "on click select Entity"
+            if (check(TokenType.ON)) {
+                expect(TokenType.ON)
+                expect(TokenType.CLICK)
+                expect(TokenType.SELECT)
+                onClickSelect = expect(TokenType.IDENTIFIER).value
+                break
+            }
             expect(TokenType.IDENTIFIER) // skip entity name prefix
             expect(TokenType.DOT)
             fields.add(expect(TokenType.IDENTIFIER).value)
         }
 
-        return ListElement(name, entityName, fields, location)
+        return ListElement(name, entityName, fields, onClickSelect, location)
     }
 
     // --- Reaction ---

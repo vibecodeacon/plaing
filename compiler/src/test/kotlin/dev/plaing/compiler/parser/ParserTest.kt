@@ -1157,4 +1157,73 @@ on NOTE_CREATED:
         assertEquals(1, reactions.size)
         assertEquals("Note", entities[0].name)
     }
+
+    // --- Select + Edit features ---
+
+    @Test
+    fun `parses list with on click select`() {
+        val program = parse("""
+page NotesPage:
+  layout main:
+    list notes: each Note show Note.title, Note.body, on click select Note
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val list = layout.children[0] as ListElement
+        assertEquals("notes", list.name)
+        assertEquals("Note", list.entityName)
+        assertEquals(listOf("title", "body"), list.fields)
+        assertEquals("Note", list.onClickSelect)
+    }
+
+    @Test
+    fun `parses list without on click select`() {
+        val program = parse("""
+page NotesPage:
+  layout main:
+    list notes: each Note show Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val list = layout.children[0] as ListElement
+        assertNull(list.onClickSelect)
+    }
+
+    @Test
+    fun `parses input with fills from`() {
+        val program = parse("""
+page EditPage:
+  layout main:
+    form edit-form:
+      input title: placeholder "Title", binds to title, fills from Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val form = layout.children[0] as FormElement
+        val input = form.children[0] as InputElement
+        val fillsFrom = input.properties.filterIsInstance<InputProperty.FillsFrom>().first()
+        assertEquals("Note", fillsFrom.entityName)
+        assertEquals("title", fillsFrom.fieldName)
+    }
+
+    @Test
+    fun `parses full select and edit page`() {
+        val program = parse("""
+page NotesPage:
+  layout main:
+    heading "My Notes"
+    list notes: each Note show Note.title, Note.body, on click select Note
+    form edit-form:
+      input title: placeholder "Title", binds to title, fills from Note.title
+      input body: placeholder "Body", binds to body, fills from Note.body
+      button "Save": emits UPDATE_NOTE with title, body
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        assertEquals(3, layout.children.size)
+        val list = layout.children[1] as ListElement
+        assertEquals("Note", list.onClickSelect)
+        val form = layout.children[2] as FormElement
+        assertEquals(3, form.children.size)
+    }
 }

@@ -1892,6 +1892,69 @@ page LoginPage:
         assertFalse(code.contains("import dev.plaing.generated.style.*"), "Should not import style package")
     }
 
+    // ---------------------------------------------------------------
+    // Select + Edit: list click + input fills from
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `PageGen generates clickable list items with on click select`() {
+        val program = parseProgram("""
+page NotesPage:
+  layout main:
+    list notes: each Note show Note.title, Note.body, on click select Note
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("onClick = { stateStore.selectEntity(\"Note\", item) }"), "List item should call selectEntity on click")
+    }
+
+    @Test
+    fun `PageGen generates list without onClick when no select`() {
+        val program = parseProgram("""
+page NotesPage:
+  layout main:
+    list notes: each Note show Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertFalse(code.contains("onClick"), "List item should not have onClick without select")
+    }
+
+    @Test
+    fun `PageGen generates input with fills from`() {
+        val program = parseProgram("""
+page EditPage:
+  layout main:
+    form edit-form:
+      input title: placeholder "Title", binds to title, fills from Note.title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("LaunchedEffect(stateStore.getSelectedEntity(\"Note\"))"), "Should use LaunchedEffect for fills from")
+        assertTrue(code.contains("selected[\"title\"]?.jsonPrimitive?.content"), "Should read field from selected entity")
+    }
+
+    @Test
+    fun `PageGen generates full select and edit page`() {
+        val program = parseProgram("""
+page NotesPage:
+  layout main:
+    list notes: each Note show Note.title, on click select Note
+    form edit-form:
+      input title: placeholder "Title", binds to title, fills from Note.title
+      button "Save": emits UPDATE_NOTE with title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("selectEntity"), "Should have selectEntity call")
+        assertTrue(code.contains("getSelectedEntity"), "Should have getSelectedEntity call")
+        assertTrue(code.contains("var title by remember"), "Should have bound field variable")
+    }
+
     @Suppress("DEPRECATION")
     private fun createTempDir(prefix: String): File = kotlin.io.createTempDir(prefix)
 }
