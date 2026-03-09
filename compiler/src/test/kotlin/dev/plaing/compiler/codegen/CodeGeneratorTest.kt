@@ -1955,6 +1955,41 @@ page NotesPage:
         assertTrue(code.contains("var title by remember"), "Should have bound field variable")
     }
 
+    // ---------------------------------------------------------------
+    // Conditional button: if Entity selected emits X otherwise emits Y
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `PageGen generates conditional button with if selected`() {
+        val program = parseProgram("""
+page NotesPage:
+  layout main:
+    form note-form:
+      input title: placeholder "Title", binds to title
+      button "Save": if Note selected emits UPDATE_NOTE with title otherwise emits CREATE_NOTE with title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("getSelectedEntity(\"Note\") != null"), "Should check for selected entity")
+        assertTrue(code.contains("\"UPDATE_NOTE\""), "Should emit UPDATE_NOTE when selected")
+        assertTrue(code.contains("\"CREATE_NOTE\""), "Should emit CREATE_NOTE otherwise")
+    }
+
+    @Test
+    fun `PageGen generates non-conditional button normally`() {
+        val program = parseProgram("""
+page LoginPage:
+  layout main:
+    button "Login": emits LOGIN_ATTEMPT with email
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val pageGen = PageGen()
+        val code = pageGen.generate(page, "dev.plaing.generated.ui")
+        assertTrue(code.contains("\"LOGIN_ATTEMPT\""))
+        assertFalse(code.contains("getSelectedEntity"), "Should not have conditional logic")
+    }
+
     @Suppress("DEPRECATION")
     private fun createTempDir(prefix: String): File = kotlin.io.createTempDir(prefix)
 }

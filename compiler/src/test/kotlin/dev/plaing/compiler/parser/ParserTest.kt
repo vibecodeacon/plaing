@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 
@@ -1225,5 +1226,45 @@ page NotesPage:
         assertEquals("Note", list.onClickSelect)
         val form = layout.children[2] as FormElement
         assertEquals(3, form.children.size)
+    }
+
+    @Test
+    fun `parses conditional button`() {
+        val program = parse("""
+page NotesPage:
+  layout main:
+    form note-form:
+      input title: placeholder "Title", binds to title
+      button "Save": if Note selected emits UPDATE_NOTE with title otherwise emits CREATE_NOTE with title
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val form = layout.children[0] as FormElement
+        val button = form.children[1] as ButtonElement
+
+        // Default action (otherwise)
+        assertNotNull(button.action)
+        assertEquals("CREATE_NOTE", button.action!!.eventName)
+        assertEquals(listOf("title"), button.action!!.arguments)
+
+        // Conditional action (if selected)
+        assertNotNull(button.conditionalAction)
+        assertEquals("Note", button.conditionalAction!!.entityName)
+        assertEquals("UPDATE_NOTE", button.conditionalAction!!.action.eventName)
+        assertEquals(listOf("title"), button.conditionalAction!!.action.arguments)
+    }
+
+    @Test
+    fun `parses regular button without conditional`() {
+        val program = parse("""
+page LoginPage:
+  layout main:
+    button "Sign In": emits LOGIN_ATTEMPT with email
+""".trimIndent())
+        val page = program.declarations[0] as PageDeclaration
+        val layout = page.body[0] as LayoutElement
+        val button = layout.children[0] as ButtonElement
+        assertNotNull(button.action)
+        assertNull(button.conditionalAction)
     }
 }

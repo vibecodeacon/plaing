@@ -162,7 +162,7 @@ page NotesPage:
     form edit-note:
       input title: placeholder "Title", binds to title, fills from Note.title
       input body: placeholder "Body", binds to body, fills from Note.body
-      button "Save": emits UPDATE_NOTE with title, body
+      button "Save": if Note selected emits UPDATE_NOTE with title, body otherwise emits CREATE_NOTE with title, body
 ```
 
 UI elements and where they're implemented:
@@ -219,11 +219,20 @@ list notes: each Note show Note.title, Note.body, on click select Note
 
 This generates a `PlaingListItem` with an `onClick` callback that calls `stateStore.selectEntity("Note", item)`. The selected entity can then be read by inputs using `fills from Note.title`.
 
+### Conditional Buttons
+
+Buttons can conditionally emit different events based on whether an entity is selected:
+```
+button "Save": if Note selected emits UPDATE_NOTE with title otherwise emits CREATE_NOTE with title
+```
+
+This generates an `if/else` in the onClick handler that checks `stateStore.getSelectedEntity("Note") != null`. The `conditionalAction` fires when the entity is selected, the `action` (after `otherwise`) is the fallback. AST: `ButtonElement.conditionalAction: ConditionalAction?`, `ConditionalAction(entityName, action)`.
+
 The full select → edit flow:
 1. `on click select Note` — stores clicked item in `StateStore.selectedEntities`
 2. `fills from Note.title` — populates input field from selected entity via `LaunchedEffect`
 3. `binds to title` — two-way binding lets user edit the value
-4. `button "Save": emits UPDATE_NOTE with title` — sends updated data to server
+4. `if Note selected emits UPDATE_NOTE ... otherwise emits CREATE_NOTE` — conditionally creates or updates
 
 ### Styles (CSS with plain English)
 ```

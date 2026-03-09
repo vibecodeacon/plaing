@@ -100,6 +100,14 @@ input title: placeholder "Title", binds to title, fills from Note.title
 
 `fills from` populates the input from a selected entity. Use with `on click select` on a list to enable select → edit flows.
 
+### Conditional Buttons
+
+Buttons can emit different events depending on whether an entity is selected:
+
+```
+button "Save": if Note selected emits UPDATE_NOTE with title otherwise emits CREATE_NOTE with title
+```
+
 ### Reaction Actions
 
 `store Entity from Event.field`, `store all Entity from Event.field` (collections), `navigate to PageName`, `show alert Event.message on PageName`

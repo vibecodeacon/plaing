@@ -520,11 +520,24 @@ class Parser(private val tokens: List<Token>, private val fileName: String = "")
         val text = expect(TokenType.STRING_LITERAL).value
 
         var action: ButtonAction? = null
+        var conditionalAction: ConditionalAction? = null
+
         if (match(TokenType.COLON)) {
-            action = parseButtonAction()
+            if (check(TokenType.IF)) {
+                // Conditional button: if Entity selected emits EVENT ... otherwise emits EVENT ...
+                expect(TokenType.IF)
+                val entityName = expect(TokenType.IDENTIFIER).value
+                expect(TokenType.SELECTED)
+                val selectedAction = parseButtonAction()
+                expect(TokenType.OTHERWISE)
+                action = parseButtonAction()
+                conditionalAction = ConditionalAction(entityName, selectedAction)
+            } else {
+                action = parseButtonAction()
+            }
         }
 
-        return ButtonElement(text, action, location)
+        return ButtonElement(text, action, conditionalAction, location)
     }
 
     private fun parseButtonAction(): ButtonAction {

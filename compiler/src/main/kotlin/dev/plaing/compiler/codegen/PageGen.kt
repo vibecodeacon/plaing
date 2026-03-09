@@ -140,7 +140,25 @@ class PageGen {
                 val styleFn = styleFunction(element.text.lowercase().replace(" ", "-"), styleNames)
                 sb.appendLine("${indent}PlaingButton(")
                 sb.appendLine("${indent}    text = \"${element.text}\",")
-                if (element.action != null) {
+                if (element.conditionalAction != null && element.action != null) {
+                    val cond = element.conditionalAction
+                    val fallback = element.action
+                    sb.appendLine("${indent}    onClick = {")
+                    sb.appendLine("${indent}        if (stateStore.getSelectedEntity(\"${cond.entityName}\") != null) {")
+                    sb.appendLine("${indent}            onEvent(\"${cond.action.eventName}\", buildJsonObject {")
+                    for (arg in cond.action.arguments) {
+                        sb.appendLine("${indent}                put(\"$arg\", $arg)")
+                    }
+                    sb.appendLine("${indent}            })")
+                    sb.appendLine("${indent}        } else {")
+                    sb.appendLine("${indent}            onEvent(\"${fallback.eventName}\", buildJsonObject {")
+                    for (arg in fallback.arguments) {
+                        sb.appendLine("${indent}                put(\"$arg\", $arg)")
+                    }
+                    sb.appendLine("${indent}            })")
+                    sb.appendLine("${indent}        }")
+                    sb.appendLine("${indent}    },")
+                } else if (element.action != null) {
                     val action = element.action
                     sb.appendLine("${indent}    onClick = {")
                     sb.appendLine("${indent}        onEvent(\"${action.eventName}\", buildJsonObject {")

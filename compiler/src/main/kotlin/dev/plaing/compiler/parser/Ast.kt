@@ -265,6 +265,7 @@ data class ListElement(
 data class ButtonElement(
     val text: String,
     val action: ButtonAction?,
+    val conditionalAction: ConditionalAction? = null,
     override val location: SourceLocation
 ) : UiElement()
 
@@ -283,6 +284,11 @@ data class ButtonAction(
     val eventName: String,
     val arguments: List<String>,
     val location: SourceLocation
+)
+
+data class ConditionalAction(
+    val entityName: String,
+    val action: ButtonAction,
 )
 
 // --- Reaction Actions ---
